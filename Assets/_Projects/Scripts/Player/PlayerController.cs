@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 /// <summary>
 /// PlayerController2D: moves a Rigidbody2D using acceleration toward a target velocity
@@ -6,7 +7,7 @@ using UnityEngine;
 ///
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
-public class PlayerController2D : MonoBehaviour
+public class PlayerController : MonoBehaviour, IHitable, IKnockbackable
 {
     [Header("Components")]
     [Tooltip("Reference to the PlayerInputManager to read input from.")]
@@ -17,8 +18,15 @@ public class PlayerController2D : MonoBehaviour
     public float maxSpeed = 5f;
     public float acceleration = 20f;
 
+    [Header("Player Params")]
+    public float MaxHealth = 100f;
+    public float currentHealth;
+
+    [Header("Events")]
+    public UnityEvent<float> onHitReceived;
 
     private Rigidbody2D _rb;
+
 
 
     private void Awake()
@@ -36,6 +44,7 @@ public class PlayerController2D : MonoBehaviour
         {
             Debug.LogWarning("PlayerController2D has no PlayerInputManager assigned.");
         }
+        currentHealth = MaxHealth;
     }
 
 
@@ -52,5 +61,23 @@ public class PlayerController2D : MonoBehaviour
 
 
         _rb.linearVelocity = newVelocity;
+    }
+
+    public void ApplyHit(float damage)
+    {
+        currentHealth -= damage;
+        onHitReceived?.Invoke(Mathf.Clamp01(currentHealth / MaxHealth));
+
+        if (currentHealth <= 0)
+        {
+            //Death logic
+        }
+    }
+
+    [Range(0,1)] public float knockbackForce = 1;
+    public void KnockbackTarget(float force, Vector2 dir)
+    {
+        print("Knockback");
+        _rb.AddForce(dir * force * knockbackForce, ForceMode2D.Impulse);
     }
 }

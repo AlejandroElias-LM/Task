@@ -57,4 +57,6 @@ public class PlayerAnimatorController : MonoBehaviour
             visualObject.localScale = originalScale;
         }
     }
+
+
 }

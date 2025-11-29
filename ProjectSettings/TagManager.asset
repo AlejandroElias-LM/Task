@@ -5,15 +5,16 @@ TagManager:
   serializedVersion: 3
   tags:
   - Wall
+  - Enemy
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - PongBall
+  - Player
   - Water
   - UI
   - Wall
-  - 
+  - Hitable
   - 
   - 
   - 
