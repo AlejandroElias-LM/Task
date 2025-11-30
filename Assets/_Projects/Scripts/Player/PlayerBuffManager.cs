@@ -1,12 +1,19 @@
 using NaughtyAttributes;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class PlayerBuffManager : MonoBehaviour
 {
     public static PlayerBuffManager instance;
 
+    public float flatDamage = 0, flatAtkSpd = 0, flatRange = 0;
+
     private Dictionary<ModifierType, TypeBucket> playerBuffs;
+
+    [Header("events")]
+    public UnityEvent onHealthBuffChanged;
+    public UnityEvent onDamageBuffChanged;
 
     private void Awake()
     {
@@ -14,11 +21,34 @@ public class PlayerBuffManager : MonoBehaviour
             Destroy(this);
 
         instance = this;
+        playerBuffs = new();
     }
 
     void Start()
     {
-        playerBuffs = new();
+
+    }
+
+    public void AddFlatStats(WeaponItem item)
+    {
+        print("adding flats");
+        this.flatDamage += item.damage;
+        this.flatAtkSpd += item.attackSpeed;
+        this.flatRange += item.range;
+
+        onDamageBuffChanged?.Invoke();
+    }
+    public void RemoveFlatStats(WeaponItem item)
+    {
+        this.flatDamage -= item.damage;
+        this.flatAtkSpd -= item.attackSpeed;
+        this.flatRange -= item.range;
+        onDamageBuffChanged?.Invoke();
+    }
+
+    public (float dmg, float atkSpd, float range) GetFlatStats()
+    {
+        return (dmg: flatDamage, atkSpd: flatAtkSpd, range: flatRange);
     }
 
     public void AddModifier(Modifier mod)
@@ -32,6 +62,11 @@ public class PlayerBuffManager : MonoBehaviour
             var tb = new TypeBucket(this, mod);
             playerBuffs[mod.type] = tb;
         }
+
+        if ((int)mod.type >= 1 && (int)mod.type <= 4)
+            onHealthBuffChanged?.Invoke(); 
+        if ((int)mod.type >= 5 && (int)mod.type <= 8)
+            onDamageBuffChanged?.Invoke();
     }
 
     public void RemoveModifier(Modifier mod)
@@ -40,6 +75,11 @@ public class PlayerBuffManager : MonoBehaviour
         {
             playerBuffs[mod.type].RemoveModifier(mod);
         }
+
+        if ((int)mod.type >= 1 && (int)mod.type <= 4)
+            onHealthBuffChanged?.Invoke();
+        if ((int)mod.type >= 5 && (int)mod.type <= 8)
+            onDamageBuffChanged?.Invoke();
     }
 
     public void RemoveBucket(ModifierType type)
@@ -64,6 +104,12 @@ public class PlayerBuffManager : MonoBehaviour
         {
             dict.Print();
         }
+    }
+
+    public TypeBucket GetBuffBucket(ModifierType type)
+    {
+        if (playerBuffs.ContainsKey(type)) return playerBuffs[type];
+        else return null;
     }
 }
 

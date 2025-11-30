@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c73e86e37672ebc4fb3c1ff0bb110622, type: 3}
   m_Name: Fine Axe
   m_EditorClassIdentifier: Assembly-CSharp::WeaponItemData
+  itemName: Fine Axe
   minDamage: 6
   maxDamage: 9
   attackSpeed: 0.9
@@ -33,9 +34,9 @@ MonoBehaviour:
     chanceToGet: 40
     minValue: 7
     maxValue: 12
-  - type: 3
+  - type: 2
     operation: 0
-    chanceToGet: 45
+    chanceToGet: 100
     minValue: 5
     maxValue: 8
   uniquePassives: []

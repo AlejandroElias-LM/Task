@@ -60,14 +60,15 @@ public class GeneralInventoryManager : MonoBehaviour
 
         var inventoryCellPos = currentInventory.GetChild(pos);
         draggedItem.transform.localEulerAngles = Vector3.zero;
-        draggedItem.transform.localScale = Vector3.one;
+        draggedItem.transform.localScale = Vector3.one * .75f;
 
         var dist = inventoryCellPos.position - draggedPos.position;
         draggedItem.transform.position += dist;
 
-        var list = currentInventory.PlaceShapeAt(draggedItem.shape, draggedItem.clickedCell, oldInvPos);
+        var list = currentInventory.PlaceShapeAt(draggedItem.shape, draggedItem.clickedCell, pos);
 
         draggedItem.currentFilledPosition = new FilledPosition(currentInventory, list, true);
         draggedItem.ConnectItem();
+        draggedItem.OnPlaced?.Invoke();
     }
 }

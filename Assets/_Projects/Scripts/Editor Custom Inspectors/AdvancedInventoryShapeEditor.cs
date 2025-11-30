@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEditor;
-
+#if UnityEditor
 [CustomEditor(typeof(AdvancedInventoryShape))]
 public class AdvancedInventoryShapeEditor : Editor
 {
@@ -138,3 +138,4 @@ public class AdvancedInventoryShapeEditor : Editor
         Repaint();
     }
 }
+#endif

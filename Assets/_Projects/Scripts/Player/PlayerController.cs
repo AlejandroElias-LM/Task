@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -20,19 +22,22 @@ public class PlayerController : MonoBehaviour, IHitable, IKnockbackable
 
     [Header("Player Params")]
     public float MaxHealth = 100f;
+    float currentMaxHealth = 100f;
     public float currentHealth;
 
     [Header("Events")]
     public UnityEvent<float> onHitReceived;
+    public UnityEvent<string> lifeValueUpdate;
 
     private Rigidbody2D _rb;
 
+    public UnityEvent<EnemyController> applyHitEffect;
 
-
+    private Dictionary<ModifierType, (Action<float>,float)> onHitEffects;
     private void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
-
+        onHitEffects = new();
 
         if (inputManager == null)
         {
@@ -44,7 +49,17 @@ public class PlayerController : MonoBehaviour, IHitable, IKnockbackable
         {
             Debug.LogWarning("PlayerController2D has no PlayerInputManager assigned.");
         }
+        currentMaxHealth = MaxHealth;
         currentHealth = MaxHealth;
+
+        applyHitEffect.AddListener((EnemyController _) =>
+        {
+            foreach (var hfx in onHitEffects)
+            {
+                var v = hfx.Value;
+                v.Item1.Invoke(v.Item2);
+            }
+        });
     }
 
 
@@ -63,11 +78,11 @@ public class PlayerController : MonoBehaviour, IHitable, IKnockbackable
         _rb.linearVelocity = newVelocity;
     }
 
-    public void ApplyHit(float damage)
+    public void ApplyHit(float damage, GameObject hitter)
     {
         currentHealth -= damage;
-        onHitReceived?.Invoke(Mathf.Clamp01(currentHealth / MaxHealth));
-
+        onHitReceived?.Invoke(Mathf.Clamp01(currentHealth / currentMaxHealth));
+        lifeValueUpdate?.Invoke(currentHealth + "/" + currentMaxHealth);
         if (currentHealth <= 0)
         {
             //Death logic
@@ -79,5 +94,44 @@ public class PlayerController : MonoBehaviour, IHitable, IKnockbackable
     {
         print("Knockback");
         _rb.AddForce(dir * force * knockbackForce, ForceMode2D.Impulse);
+    }
+
+
+    public void LoadHealthBuff()
+    {
+        if (PlayerBuffManager.instance == null) return;
+        var instance = PlayerBuffManager.instance;
+
+        var healthNorm = currentHealth / currentMaxHealth;
+        var healthStatBuff = instance.GetBuffBucket(ModifierType.MaxHealth);
+        if(healthStatBuff != null)
+        {
+            var value = healthStatBuff.GetValue();
+            currentMaxHealth = MaxHealth + value;
+            currentHealth = currentMaxHealth * healthNorm;
+            lifeValueUpdate?.Invoke(Mathf.Floor(currentHealth) + "/" + currentMaxHealth);
+        }
+
+        var healthOnHit = instance.GetBuffBucket(ModifierType.HealthPerHit);
+        if(healthOnHit != null)
+        {
+            onHitEffects[ModifierType.HealthPerHit] = ((float value )=>
+            {
+                this.currentHealth = Mathf.Clamp(currentHealth + value, 0, currentMaxHealth);
+                print("healing " + value);
+
+                lifeValueUpdate?.Invoke(Mathf.Floor(currentHealth) + "/" + currentMaxHealth);
+                onHitReceived?.Invoke(Mathf.Clamp01(currentHealth / currentMaxHealth));
+            }          
+            , healthOnHit.GetValue());
+        }
+        else
+        {
+            if (onHitEffects.ContainsKey(ModifierType.HealthPerHit))
+            {
+                onHitEffects.Remove(ModifierType.HealthPerHit);
+            }
+
+        }
     }
 }

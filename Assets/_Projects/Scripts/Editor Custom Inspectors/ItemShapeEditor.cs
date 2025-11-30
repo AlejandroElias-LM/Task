@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(InventoryShape))]
 public class ItemShapeEditor : Editor
 {
@@ -67,3 +68,4 @@ public class ItemShapeEditor : Editor
         serializedObject.ApplyModifiedProperties();
     }
 }
+#endif

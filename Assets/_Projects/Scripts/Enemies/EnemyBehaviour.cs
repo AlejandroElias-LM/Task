@@ -237,7 +237,7 @@ public class EnemyBehaviour : MonoBehaviour, IHitable, IKnockbackable
                 hit.attachedRigidbody.TryGetComponent<IHitable>(out IHitable playerHitable);
                 if(playerHitable != null)
                 {
-                    playerHitable.ApplyHit(10f);
+                    playerHitable.ApplyHit(10f, gameObject);
                     if (playerHitable is IKnockbackable)
                         (playerHitable as IKnockbackable).KnockbackTarget(10f, new Vector2(Mathf.Sign(visualObject.localScale.x), 0));
                 }
@@ -271,7 +271,7 @@ public class EnemyBehaviour : MonoBehaviour, IHitable, IKnockbackable
     }
 
 
-    public void ApplyHit(float damage)
+    public void ApplyHit(float damage, GameObject agressor)
     {
         currentHealth -= damage;
         onHitReceived?.Invoke(Mathf.Clamp01(currentHealth / MaxHealth));

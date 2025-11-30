@@ -133,13 +133,14 @@ public class ItemAnimator : MonoBehaviour
     {
         selected = false;
         targetScale = InactiveScale;
+        inventoryItem.ChangeColor(inventoryItem.normal);
     }
     void HandleHover(bool onHover)
     {
         hovering = onHover;
     }
 
-    void HandlePlaced()
+    public void HandlePlaced()
     {
         selected = false;
         targetScale = PlacedScale;

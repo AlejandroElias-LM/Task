@@ -8,8 +8,8 @@ public class TooltipMessager : MonoBehaviour, IPointerEnterHandler, IPointerExit
     public void OnPointerEnter(PointerEventData eventData)
     {
         var instance = TooltipManager.instance;
-        if (instance != null && item.itemData != null)
-            instance.ShowInformation(item.itemData);
+        if (instance != null && item.GetItemData != null)
+            instance.ShowInformation(item.GetItemData);
     }
 
     public void OnPointerExit(PointerEventData eventData)

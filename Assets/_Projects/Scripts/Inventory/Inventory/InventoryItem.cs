@@ -9,6 +9,7 @@ using UnityEngine.Events;
 /// Small helper struct used to represent an item occupying slots in an inventory.
 /// Kept here for convenience but you can move it to its own file if you prefer.
 /// </summary>
+[System.Serializable]
 public struct FilledPosition
 {
     public Inventory currentInventory;
@@ -32,17 +33,45 @@ public struct FilledPosition
 [RequireComponent(typeof(RectTransform))]
 public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
-    #region Item data
+    #region Serialized / Inspector fields
+
     [Header("Item Data")]
     [SerializeField] private WeaponItemData spawnData;
 
     [Space]
     [InfoBox("Automatically generated runtime data. Use GenerateItemData() to recreate from SpawnData.")]
-    public WeaponItem itemData;
+    [ShowIf(nameof(spawnData))]
+    [SerializeField] private WeaponItem itemData; // runtime data (generated from spawnData)
+
+    [Header("Shape")]
+    public InventoryShapeBase shape;
+    public GridLayoutGroup layoutParent; // used for instantiating hitbox children
+    public GameObject[] fillObjects; // prefabs used as cell visuals
+
+    [Header("Movement")]
+    [SerializeField] private float followSpeed = 15f;
+
+    [Header("Color Feedback")]
+    [Range(0, 100)] public float alpha = 33f;
+    public Color normal;
+    public Color blocked;
+    public Color placeable;
+    public Image[] feedbackObjects;
+
+    #endregion
+
+    #region Public / Inspector-accessible API
+
+    /// <summary>
+    /// Read-only access to the generated runtime item data.
+    /// </summary>
+    public WeaponItem GetItemData => itemData;
+    public WeaponItem SetItemData (WeaponItem item) => itemData = item;
 
     [Button]
     public void GenerateItemData()
     {
+        if (spawnData == null) return;
         itemData = new WeaponItem();
         itemData.Setup(spawnData);
     }
@@ -56,17 +85,12 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
     {
         if (itemData != null) itemData.Unsubscribe();
     }
-    #endregion
-
-    #region Shape / Layout
-    [Header("Shape")]
-    public InventoryShapeBase shape;
-    public GridLayoutGroup layoutParent; // used for instantiating hitbox children
-    public GameObject[] fillObjects; // prefabs used as cell visuals
 
     [Button]
     public void FillChildren()
     {
+        if (shape == null || layoutParent == null || fillObjects == null || fillObjects.Length == 0) return;
+
         // clear existing children cleanly (editor vs playmode)
         var parent = layoutParent.transform;
         for (int i = parent.childCount - 1; i >= 0; --i)
@@ -101,59 +125,54 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
     /// Coordinates of the clicked child cell relative to the layout.
     /// </summary>
     public Vector2 clickedCell;
-    #endregion
-
-    #region Drag / Movement
-    [Header("Movement")]
-    [SerializeField] private float followSpeed = 15f;
-    private RectTransform rectTransform;
-    private bool isDragging;
-    private Vector2 dragOffset;
-    #endregion
-
-    #region Visual feedback
-    [Header("Color Feedback")]
-    [Range(0, 100)] public float alpha = 33f;
-    public Color normal, blocked, placeable;
-    public Image[] feedbackObjects;
-    private Color currentColor;
-    #endregion
 
     [HideInInspector] public FilledPosition currentFilledPosition;
 
+    #endregion
+
     #region Events
+
     // Hidden events so other components (ItemAnimator) can subscribe
     public UnityEvent<Vector2> OnGrabbed = new UnityEvent<Vector2>();
     public UnityEvent OnReleased = new UnityEvent();
     public UnityEvent<bool> OnHoveringInventory = new UnityEvent<bool>();
     public UnityEvent OnPlaced = new UnityEvent();
+
     #endregion
 
+    #region Private state
+
+    private RectTransform rectTransform;
+    private bool isDragging;
+    public bool IsBeingDragged => isDragging;
+    private Vector2 dragOffset;
+    private Color currentColor;
     private bool hovering = false;
+    [HideInInspector] public bool insideInventory = false;
+
+    #endregion
+
+    #region Unity callbacks
 
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
+
+        // maintain insideInventory state based on events
+        OnPlaced.AddListener(() => { insideInventory = true; });
+        OnGrabbed.AddListener((Vector2 _) => { insideInventory = false; });
     }
 
-    private void OnEnable()
+    private void Start()
     {
-        // attempt to generate runtime data if missing but SpawnData exists
+        InventorySaveManager.instance?.SubscribeItem(this);
         if (itemData == null && spawnData != null)
             GenerateItemData();
-
-        // keep item subscribed only while enabled
-        ConnectItem();
     }
 
     private void OnDisable()
     {
         RemoveItem();
-    }
-
-    private void Start()
-    {
-        // Intentionally light — generate only if necessary (OnEnable already attempts this)
     }
 
     private void Update()
@@ -171,62 +190,21 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
         rectTransform.anchoredPosition = Vector2.Lerp(rectTransform.anchoredPosition, targetPos, Time.deltaTime * followSpeed);
     }
 
-    #region Hovering / Color Helpers
-    /// <summary>
-    /// Notify listeners when the item enters/leaves an inventory area.
-    /// </summary>
-    public void SetHover(bool b)
-    {
-        if (hovering == b) return;
-        hovering = b;
-        OnHoveringInventory?.Invoke(b);
-    }
-
-    /// <summary>
-    /// Change overlay color applied to all feedback cell images.
-    /// </summary>
-    public void ChangeColor(Color newColor)
-    {
-        // Note: Color is a struct so comparing directly is fine
-        if (currentColor == newColor) return;
-
-        newColor.a = alpha / 100f; // alpha is expected in 0-100 range in inspector
-        foreach (var img in feedbackObjects)
-        {
-            if (img == null) continue;
-            img.color = newColor;
-        }
-        currentColor = newColor;
-    }
     #endregion
 
     #region Pointer events
-    public void OnPointerUp(PointerEventData eventData)
-    {
-        isDragging = false;
-
-        // notify listeners that the item was released
-        OnReleased?.Invoke();
-
-        // Try to place (existing manager call)
-        if (GeneralInventoryManager.instance != null)
-        {
-            GeneralInventoryManager.instance.PlaceObject();
-            GeneralInventoryManager.instance.draggedItem = null;
-        }
-
-        // notify listeners that the item was (attempted) placed
-        OnPlaced?.Invoke();
-    }
 
     public void OnPointerDown(PointerEventData eventData)
     {
         // if item was locked in an inventory, free it first
-        if (currentFilledPosition.locked)
+        if (currentFilledPosition.locked && currentFilledPosition.currentInventory != null)
         {
             currentFilledPosition.currentInventory.FreeIndices(currentFilledPosition.occupiedSlots);
             currentFilledPosition.locked = false;
-            RemoveItem();
+
+            // Only remove buffs if taken from the main inventory
+            if (currentFilledPosition.currentInventory == GeneralInventoryManager.instance?.currentInventory)
+                RemoveItem();
         }
 
         // Find which child cell was clicked
@@ -236,11 +214,6 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
             clickedCell = _clickedCell;
             if (GeneralInventoryManager.instance != null)
                 GeneralInventoryManager.instance.draggedItem = this;
-            Debug.Log($"Clicked cell: ({clickedCell})");
-        }
-        else
-        {
-            Debug.Log("No child cell detected under pointer.");
         }
 
         // Setup drag offset
@@ -257,9 +230,61 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
         // notify listeners that the item was grabbed
         OnGrabbed?.Invoke(dragOffset);
     }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        isDragging = false;
+
+        // notify listeners that the item was released
+        OnReleased?.Invoke();
+
+        // Try to place (existing manager call)
+        if (GeneralInventoryManager.instance != null)
+        {
+            GeneralInventoryManager.instance.PlaceObject();
+            GeneralInventoryManager.instance.draggedItem = null;
+        }
+    }
+
+    #endregion
+
+    #region Hovering / Color Helpers
+
+    /// <summary>
+    /// Notify listeners when the item enters/leaves an inventory area.
+    /// </summary>
+    public void SetHover(bool b)
+    {
+        if (hovering == b) return;
+        hovering = b;
+        OnHoveringInventory?.Invoke(b);
+    }
+
+    /// <summary>
+    /// Change overlay color applied to all feedback cell images.
+    /// </summary>
+    public void ChangeColor(Color newColor)
+    {
+        // Color is a struct; compare to avoid redundant assignments.
+        if (currentColor == newColor) return;
+
+        newColor.a = alpha / 100f; // inspector alpha is 0-100
+        if (feedbackObjects != null)
+        {
+            foreach (var img in feedbackObjects)
+            {
+                if (img == null) continue;
+                img.color = newColor;
+            }
+        }
+
+        currentColor = newColor;
+    }
+
     #endregion
 
     #region Child detection / helpers
+
     /// <summary>
     /// Tries to detect which child of layoutParent was clicked.
     /// Returns true and outputs x,y coordinates (based on instantiation order: y * width + x)
@@ -268,11 +293,12 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
     {
         cell = Vector2.one * -1;
 
-        if (layoutParent == null || layoutParent.transform.childCount == 0)
+        if (layoutParent == null || layoutParent.transform.childCount == 0 || shape == null)
             return false;
 
         var parent = layoutParent.transform;
         int childCount = parent.childCount;
+        int width = Mathf.Max(1, shape.width);
 
         for (int i = 0; i < childCount; i++)
         {
@@ -281,7 +307,6 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
 
             if (RectTransformUtility.RectangleContainsScreenPoint(child, eventData.position, eventData.pressEventCamera))
             {
-                int width = Mathf.Max(1, shape.width);
                 int index = i;
                 int x = index % width;
                 int y = index / width;
@@ -302,5 +327,61 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
         int i = (int)(pos.y * shape.width) + (int)pos.x;
         return layoutParent.transform.GetChild(i) as RectTransform;
     }
+
+    public void SaveState(ref ItemSaveState save)
+    {
+        save.position = transform.position;
+        save.scale = transform.localScale;
+        save.localEul = transform.localEulerAngles;
+
+        save.currentItem = itemData;
+        save.currentFilledPos = currentFilledPosition;
+
+        save.typeOfItem = itemData.name switch
+        {
+            "Rusted Sword" => ItemSaveState.prefabType.RustedSword,
+            "Rusted Axe" => ItemSaveState.prefabType.RustedAxe,
+            "Fine Sword" => ItemSaveState.prefabType.FineSword,
+            "Fine Axe" => ItemSaveState.prefabType.FineAxe,
+            _ => ItemSaveState.prefabType.RustedSword
+        };
+    }
+
+    public void LoadState(ItemSaveState save)
+    {
+        transform.position = save.position;
+        transform.localScale = save.scale;
+        transform.localEulerAngles = save.localEul;
+
+        itemData = save.currentItem;
+
+        currentFilledPosition = save.currentFilledPos;
+
+        Invoke("ConnectItem", .25f);
+
+        GetComponent<ItemAnimator>().HandlePlaced();
+
+
+    }
+
     #endregion
+}
+
+[System.Serializable]
+public struct ItemSaveState
+{
+    [Header("Basics")]
+    public Vector3 position;
+    public Vector3 scale;
+    public Vector3 localEul;
+
+    [Header("Item Data")]
+    public WeaponItem currentItem; // save the stats and modifiers so we can build the buff system later
+
+    [Header("Inventory Occupied Slots")]
+    public FilledPosition currentFilledPos;
+
+    public enum prefabType { FineAxe, FineSword, RustedAxe, RustedSword }
+
+    public prefabType typeOfItem;
 }

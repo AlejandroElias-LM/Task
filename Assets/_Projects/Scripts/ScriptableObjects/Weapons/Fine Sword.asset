@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c73e86e37672ebc4fb3c1ff0bb110622, type: 3}
   m_Name: Fine Sword
   m_EditorClassIdentifier: Assembly-CSharp::WeaponItemData
+  itemName: Fine Sword
   minDamage: 4
   maxDamage: 8
   attackSpeed: 1.25

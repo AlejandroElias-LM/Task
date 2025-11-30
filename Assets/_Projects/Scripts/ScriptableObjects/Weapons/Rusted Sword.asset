@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c73e86e37672ebc4fb3c1ff0bb110622, type: 3}
   m_Name: Rusted Sword
   m_EditorClassIdentifier: Assembly-CSharp::WeaponItemData
+  itemName: Rusted Sword
   minDamage: 1
   maxDamage: 3
   attackSpeed: 1

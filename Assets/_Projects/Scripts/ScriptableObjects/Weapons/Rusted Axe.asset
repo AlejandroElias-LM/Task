@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c73e86e37672ebc4fb3c1ff0bb110622, type: 3}
   m_Name: Rusted Axe
   m_EditorClassIdentifier: Assembly-CSharp::WeaponItemData
+  itemName: Rusted Axe
   minDamage: 3
   maxDamage: 6
   attackSpeed: 0.85
@@ -33,7 +34,7 @@ MonoBehaviour:
     chanceToGet: 40
     minValue: 3
     maxValue: 8
-  - type: 3
+  - type: 2
     operation: 0
     chanceToGet: 33
     minValue: 3

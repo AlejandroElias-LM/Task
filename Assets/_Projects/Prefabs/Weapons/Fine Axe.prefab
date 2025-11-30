@@ -499,9 +499,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7409150295b0f2478d5c508d7c63ac3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemAnimator
-  InactiveScale: {x: 1, y: 1, z: 1}
+  InactiveScale: {x: 0.4, y: 0.4, z: 0.4}
   SelectedScale: {x: 1.08, y: 1.08, z: 1.08}
-  PlacedScale: {x: 0.95, y: 0.95, z: 0.95}
+  PlacedScale: {x: 0.75, y: 0.75, z: 0.75}
   scaleLerpSpeed: 12
   rotationLerpSpeed: 10
   jiggleForce: 6
@@ -584,7 +584,7 @@ MonoBehaviour:
     m_Right: 0
     m_Top: 0
     m_Bottom: 0
-  m_ChildAlignment: 0
+  m_ChildAlignment: 4
   m_StartCorner: 0
   m_StartAxis: 0
   m_CellSize: {x: 100, y: 100}

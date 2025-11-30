@@ -217,7 +217,7 @@ public class EnemyMeleeCombat : MonoBehaviour
                 // send ApplyHit to IHitable
                 if (hitRb.TryGetComponent<IHitable>(out IHitable playerHitable))
                 {
-                    playerHitable.ApplyHit(damage);
+                    playerHitable.ApplyHit(damage, gameObject);
                 }
 
                 // send knockback if supported

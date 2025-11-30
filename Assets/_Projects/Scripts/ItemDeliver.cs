@@ -23,7 +23,7 @@ public class ItemDeliver : MonoBehaviour
 
     public void DeliverItem(GameObject prefab)
     {
-        var item = Instantiate(prefab, transform.localPosition, Quaternion.identity, transform.parent);
+        var item = Instantiate(prefab, transform.position, Quaternion.identity, transform.parent);
         print("Prefab spawnado ?"+ item == null);
         var itemBehaviour = item.GetComponent<InventoryItem>();
         print(itemBehaviour);
@@ -32,28 +32,16 @@ public class ItemDeliver : MonoBehaviour
     }
 
     IEnumerator PlaceItem(InventoryItem item) {
-        var shape = item.shape;
+        item.transform.localScale = Vector3.one * 0.75f;
+        yield return null;
         bool placed = false;
         var x = 0;
         var y = 0;
-        var draggedPos = myInventory.transform.GetChild(1).GetChild(0);
         while (!placed)
         {
-            if(myInventory.CanPlaceShapeAt(shape, Vector2.zero, new Vector2(x, y))){
-                myInventory.PlaceShapeAt(shape, Vector2.zero, new Vector2(x, y));
 
-                var i = y * myInventory.shape.width + x;
-                var inventoryCell = myInventory.transform.GetChild(1).GetChild(i);
-                
-                
+            placed = PlaceObject(item, new Vector2(x, y));
 
-                var dist = inventoryCell.position - draggedPos.position;
-                item.gameObject.transform.position += dist;
-
-                item.transform.parent = transform;
-                item.OnGrabbed.AddListener((Vector2 _) => { item.transform.parent = transform.parent; });
-                placed = true;
-            }
             x++;
             if(x >= myInventory.shape.width)
             {
@@ -64,6 +52,35 @@ public class ItemDeliver : MonoBehaviour
             yield return null;
 
         }
+        if (!placed) print("Not placed, cannot place that shape here");
+        else print("Placed in " + x + " " + y);
         yield return null; 
+    }
+
+    public bool PlaceObject(InventoryItem item,Vector2 pos)
+    {
+        var draggedPos = item.GetChild(Vector2.zero);
+
+        bool insideInventory = myInventory.GetChild(pos);
+        if (!insideInventory) return false;
+
+        bool canPlace = myInventory.CanPlaceShapeAt(item.shape, item.clickedCell, pos);
+        if (!canPlace) return false;
+
+        var inventoryCellPos = myInventory.GetChild(pos);
+        item.transform.localEulerAngles = Vector3.zero;
+        item.transform.localScale = Vector3.one * .75f;
+
+        var dist = inventoryCellPos.position - draggedPos.position;
+        item.transform.position += dist;
+
+        var list = myInventory.PlaceShapeAt(item.shape, item.clickedCell, pos);
+
+        item.currentFilledPosition = new FilledPosition(myInventory, list, true);
+        item.OnPlaced?.Invoke();
+        item.GenerateItemData();
+        item.insideInventory = false;
+        //item.ConnectItem();
+        return true;
     }
 }

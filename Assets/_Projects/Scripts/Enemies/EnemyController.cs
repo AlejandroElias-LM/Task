@@ -24,8 +24,24 @@ public class EnemyController : MonoBehaviour, IHitable, IKnockbackable
     [HideInInspector] public EnemyMeleeCombat combat;
     [HideInInspector] public EnemyHealth health;
 
-    public void ApplyHit(float damage)
+    WaveManager ownerManager;
+
+    public void Init(WaveManager manager, Vector3 position, Quaternion rotation)
     {
+        ownerManager = manager;
+        transform.position = position;
+        transform.rotation = rotation;
+        gameObject.SetActive(true);
+        health.Initialize(this);
+        health.onDeath.AddListener(() => { manager.NotifyEnemyDied(this); });
+    }
+
+    public void ApplyHit(float damage, GameObject aggressor)
+    {
+        if (aggressor.CompareTag("Player"))
+        {
+            aggressor.GetComponent<PlayerController>().applyHitEffect?.Invoke(this);
+        }
         health.ApplyHit(damage);
     }
 

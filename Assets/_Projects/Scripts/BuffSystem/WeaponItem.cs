@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
 public class WeaponItem
 {
     public string name;
@@ -11,6 +12,7 @@ public class WeaponItem
     public List<Modifier> passives;
     public void Setup(WeaponItemData data)
     {
+        
         Debug.Log("Creating Item");
         this.damage = Random.Range(data.minDamage, data.maxDamage);
         this.attackSpeed = data.attackSpeed;
@@ -35,8 +37,10 @@ public class WeaponItem
     public void Subscribe()
     {
         var instance = PlayerBuffManager.instance;
+        
         if(instance != null)
         {
+            instance.AddFlatStats(this);
             foreach(var m in passives)
             {
                 instance.AddModifier(m);
@@ -48,6 +52,7 @@ public class WeaponItem
         var instance = PlayerBuffManager.instance;
         if (instance != null)
         {
+            instance.RemoveFlatStats(this);
             foreach (var m in passives)
             {
                 instance.RemoveModifier(m);

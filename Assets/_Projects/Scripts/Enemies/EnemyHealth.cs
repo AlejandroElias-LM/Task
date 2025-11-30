@@ -15,11 +15,12 @@ public class EnemyHealth : MonoBehaviour
 
     [Tooltip("Invoked when this enemy receives a hit. Passes normalized health (0..1).")]
     public UnityEvent<float> onHitReceived;
-
+    public UnityEvent onDeath;
     public void Initialize(EnemyController controller)
     {
         ctx = controller;
         currentHealth = MaxHealth;
+        onHitReceived?.Invoke(1);
     }
 
     /// <summary>
@@ -40,8 +41,7 @@ public class EnemyHealth : MonoBehaviour
 
     void Die()
     {
-        // Death logic: you can expand this (spawn loot, play animation, disable, pool, etc.)
-        // For now we destroy the GameObject to be consistent with "Death logic" placeholder.
-        Destroy(gameObject);
+        onDeath?.Invoke();
+        //Destroy(gameObject);
     }
 }

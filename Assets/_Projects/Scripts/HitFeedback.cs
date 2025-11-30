@@ -13,6 +13,14 @@ public class HitFeedback : MonoBehaviour
         StartCoroutine(Animate());
     }
 
+    public void OnDisable()
+    {
+        foreach (var sprite in relatedSprites)
+        {
+            sprite.material.SetFloat("_FlashBlend", 0);
+        }
+    }
+
     IEnumerator Animate()
     {
         var time = 0f;
