@@ -1,0 +1,306 @@
+using NaughtyAttributes;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using UnityEngine.Events;
+
+/// <summary>
+/// Small helper struct used to represent an item occupying slots in an inventory.
+/// Kept here for convenience but you can move it to its own file if you prefer.
+/// </summary>
+public struct FilledPosition
+{
+    public Inventory currentInventory;
+    public List<int> occupiedSlots;
+    public bool locked;
+
+    public FilledPosition(Inventory currentInventory, List<int> occupiedSlots, bool locked)
+    {
+        this.locked = locked;
+        this.currentInventory = currentInventory;
+        this.occupiedSlots = occupiedSlots;
+    }
+}
+
+/// <summary>
+/// InventoryItem is responsible for the UI representation of an item inside a grid-based inventory
+/// - Supports dragging via pointer events
+/// - Shows placement feedback through an array of images (one per grid cell)
+/// - Exposes UnityEvents so animation or sound systems can react to grab/release/place
+/// </summary>
+[RequireComponent(typeof(RectTransform))]
+public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+{
+    #region Item data
+    [Header("Item Data")]
+    [SerializeField] private WeaponItemData spawnData;
+
+    [Space]
+    [InfoBox("Automatically generated runtime data. Use GenerateItemData() to recreate from SpawnData.")]
+    public WeaponItem itemData;
+
+    [Button]
+    public void GenerateItemData()
+    {
+        itemData = new WeaponItem();
+        itemData.Setup(spawnData);
+    }
+
+    public void ConnectItem()
+    {
+        if (itemData != null) itemData.Subscribe();
+    }
+
+    public void RemoveItem()
+    {
+        if (itemData != null) itemData.Unsubscribe();
+    }
+    #endregion
+
+    #region Shape / Layout
+    [Header("Shape")]
+    public InventoryShapeBase shape;
+    public GridLayoutGroup layoutParent; // used for instantiating hitbox children
+    public GameObject[] fillObjects; // prefabs used as cell visuals
+
+    [Button]
+    public void FillChildren()
+    {
+        // clear existing children cleanly (editor vs playmode)
+        var parent = layoutParent.transform;
+        for (int i = parent.childCount - 1; i >= 0; --i)
+        {
+            var child = parent.GetChild(i);
+            if (!Application.isPlaying)
+                DestroyImmediate(child.gameObject);
+            else
+                Destroy(child.gameObject);
+        }
+
+        var currentShape = shape as InventoryShape;
+        var currentAdvShape = shape as AdvancedInventoryShape;
+
+        feedbackObjects = new Image[shape.width * shape.height];
+
+        for (int y = 0; y < shape.height; y++)
+        {
+            for (int x = 0; x < shape.width; x++)
+            {
+                int point = currentAdvShape ? currentAdvShape.Get(x, y) : currentShape.Get(x, y);
+                point = Mathf.Clamp(point, 0, fillObjects.Length - 1);
+                var prefab = fillObjects[point];
+                var inst = Instantiate(prefab, layoutParent.transform);
+                inst.name = $"cell ({x},{y})";
+                feedbackObjects[y * shape.width + x] = inst.GetComponent<Image>();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Coordinates of the clicked child cell relative to the layout.
+    /// </summary>
+    public Vector2 clickedCell;
+    #endregion
+
+    #region Drag / Movement
+    [Header("Movement")]
+    [SerializeField] private float followSpeed = 15f;
+    private RectTransform rectTransform;
+    private bool isDragging;
+    private Vector2 dragOffset;
+    #endregion
+
+    #region Visual feedback
+    [Header("Color Feedback")]
+    [Range(0, 100)] public float alpha = 33f;
+    public Color normal, blocked, placeable;
+    public Image[] feedbackObjects;
+    private Color currentColor;
+    #endregion
+
+    [HideInInspector] public FilledPosition currentFilledPosition;
+
+    #region Events
+    // Hidden events so other components (ItemAnimator) can subscribe
+    public UnityEvent<Vector2> OnGrabbed = new UnityEvent<Vector2>();
+    public UnityEvent OnReleased = new UnityEvent();
+    public UnityEvent<bool> OnHoveringInventory = new UnityEvent<bool>();
+    public UnityEvent OnPlaced = new UnityEvent();
+    #endregion
+
+    private bool hovering = false;
+
+    private void Awake()
+    {
+        rectTransform = GetComponent<RectTransform>();
+    }
+
+    private void OnEnable()
+    {
+        // attempt to generate runtime data if missing but SpawnData exists
+        if (itemData == null && spawnData != null)
+            GenerateItemData();
+
+        // keep item subscribed only while enabled
+        ConnectItem();
+    }
+
+    private void OnDisable()
+    {
+        RemoveItem();
+    }
+
+    private void Start()
+    {
+        // Intentionally light — generate only if necessary (OnEnable already attempts this)
+    }
+
+    private void Update()
+    {
+        if (!isDragging) return;
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            rectTransform.parent as RectTransform,
+            Input.mousePosition,
+            null,
+            out Vector2 localMousePos
+        );
+
+        Vector2 targetPos = localMousePos + dragOffset;
+        rectTransform.anchoredPosition = Vector2.Lerp(rectTransform.anchoredPosition, targetPos, Time.deltaTime * followSpeed);
+    }
+
+    #region Hovering / Color Helpers
+    /// <summary>
+    /// Notify listeners when the item enters/leaves an inventory area.
+    /// </summary>
+    public void SetHover(bool b)
+    {
+        if (hovering == b) return;
+        hovering = b;
+        OnHoveringInventory?.Invoke(b);
+    }
+
+    /// <summary>
+    /// Change overlay color applied to all feedback cell images.
+    /// </summary>
+    public void ChangeColor(Color newColor)
+    {
+        // Note: Color is a struct so comparing directly is fine
+        if (currentColor == newColor) return;
+
+        newColor.a = alpha / 100f; // alpha is expected in 0-100 range in inspector
+        foreach (var img in feedbackObjects)
+        {
+            if (img == null) continue;
+            img.color = newColor;
+        }
+        currentColor = newColor;
+    }
+    #endregion
+
+    #region Pointer events
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        isDragging = false;
+
+        // notify listeners that the item was released
+        OnReleased?.Invoke();
+
+        // Try to place (existing manager call)
+        if (GeneralInventoryManager.instance != null)
+        {
+            GeneralInventoryManager.instance.PlaceObject();
+            GeneralInventoryManager.instance.draggedItem = null;
+        }
+
+        // notify listeners that the item was (attempted) placed
+        OnPlaced?.Invoke();
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        // if item was locked in an inventory, free it first
+        if (currentFilledPosition.locked)
+        {
+            currentFilledPosition.currentInventory.FreeIndices(currentFilledPosition.occupiedSlots);
+            currentFilledPosition.locked = false;
+            RemoveItem();
+        }
+
+        // Find which child cell was clicked
+        bool found = GetClickedChildCoords(eventData, out Vector2 _clickedCell);
+        if (found)
+        {
+            clickedCell = _clickedCell;
+            if (GeneralInventoryManager.instance != null)
+                GeneralInventoryManager.instance.draggedItem = this;
+            Debug.Log($"Clicked cell: ({clickedCell})");
+        }
+        else
+        {
+            Debug.Log("No child cell detected under pointer.");
+        }
+
+        // Setup drag offset
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            rectTransform.parent as RectTransform,
+            eventData.position,
+            eventData.pressEventCamera,
+            out dragOffset
+        );
+
+        dragOffset = rectTransform.anchoredPosition - dragOffset;
+        isDragging = true;
+
+        // notify listeners that the item was grabbed
+        OnGrabbed?.Invoke(dragOffset);
+    }
+    #endregion
+
+    #region Child detection / helpers
+    /// <summary>
+    /// Tries to detect which child of layoutParent was clicked.
+    /// Returns true and outputs x,y coordinates (based on instantiation order: y * width + x)
+    /// </summary>
+    private bool GetClickedChildCoords(PointerEventData eventData, out Vector2 cell)
+    {
+        cell = Vector2.one * -1;
+
+        if (layoutParent == null || layoutParent.transform.childCount == 0)
+            return false;
+
+        var parent = layoutParent.transform;
+        int childCount = parent.childCount;
+
+        for (int i = 0; i < childCount; i++)
+        {
+            var child = parent.GetChild(i) as RectTransform;
+            if (child == null) continue;
+
+            if (RectTransformUtility.RectangleContainsScreenPoint(child, eventData.position, eventData.pressEventCamera))
+            {
+                int width = Mathf.Max(1, shape.width);
+                int index = i;
+                int x = index % width;
+                int y = index / width;
+                cell.x = x;
+                cell.y = y;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the RectTransform of the child cell for the provided local grid coordinates.
+    /// </summary>
+    public RectTransform GetChild(Vector2 pos)
+    {
+        int i = (int)(pos.y * shape.width) + (int)pos.x;
+        return layoutParent.transform.GetChild(i) as RectTransform;
+    }
+    #endregion
+}

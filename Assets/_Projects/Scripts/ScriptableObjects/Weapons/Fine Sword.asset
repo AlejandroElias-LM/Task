@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c73e86e37672ebc4fb3c1ff0bb110622, type: 3}
+  m_Name: Fine Sword
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponItemData
+  minDamage: 4
+  maxDamage: 8
+  attackSpeed: 1.25
+  range: 1
+  randomPickCount: 3
+  possibleModifiers:
+  - type: 6
+    operation: 0
+    chanceToGet: 45
+    minValue: 3
+    maxValue: 6
+  - type: 6
+    operation: 0
+    chanceToGet: 15
+    minValue: -1
+    maxValue: -2
+  - type: 2
+    operation: 0
+    chanceToGet: 33
+    minValue: 4
+    maxValue: 6
+  - type: 4
+    operation: 0
+    chanceToGet: 33
+    minValue: 2
+    maxValue: 5
+  uniquePassives: []
