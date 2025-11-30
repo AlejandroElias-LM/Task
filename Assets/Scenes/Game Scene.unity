@@ -3487,6 +3487,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   GUIParent: {fileID: 1867240899}
+  mainInventory: {fileID: 1033545817}
   itemPrefabs:
   - {fileID: 4139122176484773359, guid: 7f6611890301c334eb8c7db6f9e4e02f, type: 3}
   - {fileID: 8252864011898435716, guid: 8132f95837be68e4697032217655297c, type: 3}

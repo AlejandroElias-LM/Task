@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
 public class InventorySaveManager : MonoBehaviour
 {
     public static InventorySaveManager instance;
 
     public Transform GUIParent;
+    public Inventory mainInventory;
     public static SaveData _saveData = new SaveData();
     public GameObject[] itemPrefabs;
 
@@ -19,6 +19,7 @@ public class InventorySaveManager : MonoBehaviour
     public struct SaveData
     {
         public ItemSaveState[] itemsData;
+        public InventorySaveState inventoryData;
     }
 
     private void Awake()
@@ -75,6 +76,8 @@ public class InventorySaveManager : MonoBehaviour
 
     private void SaveItems()
     {
+        
+
         List<InventoryItem> itemsInsideInventory = new();
         foreach(var item in currentItems)
         {
@@ -88,6 +91,8 @@ public class InventorySaveManager : MonoBehaviour
         {
              itemsInsideInventory[i].SaveState(ref _saveData.itemsData[i]);
         }
+
+        this.mainInventory.SaveState(ref _saveData.inventoryData);
     }
 
     public void TryLoad()
@@ -103,28 +108,35 @@ public class InventorySaveManager : MonoBehaviour
         {
             _saveData = JsonUtility.FromJson<SaveData>(saveContent);
             print(_saveData);
+            mainInventory = GameObject.Find("Active Inventory").GetComponent<Inventory>();
             HandleLoad();
         }
         catch(Exception e)
         {
-            print("Nothing on file, good game!");
+            Debug.LogError("Something Wrong happend ehe");
         }
-        
     }
 
     public void HandleLoad()
     {
+        if(currentItems != null)
+            currentItems.Clear();
         foreach(var item in _saveData.itemsData)
         {
             print("Type = " + item.typeOfItem);
             var obj = Instantiate(itemPrefabs[(int)item.typeOfItem], GUIParent).GetComponent<InventoryItem>();
-            obj.LoadState(item);
+            var currentItem = item;
+            currentItem.currentFilledPos.currentInventory = mainInventory;
+            obj.LoadState(currentItem);
         }
+
+        mainInventory.Load(_saveData.inventoryData);
+        
     }
 
     public void Reload()
     {
-        Save();
+        //Save();
 
         SceneManager.sceneLoaded += OnSceneLoaded;
 
@@ -163,6 +175,7 @@ public class InventorySaveManager : MonoBehaviour
         if (currentItems != null)
             currentItems.Clear();
 
-        TryLoad();
+        //TryLoad();
     }
+
 }

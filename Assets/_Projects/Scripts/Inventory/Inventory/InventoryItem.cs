@@ -361,6 +361,7 @@ public class InventoryItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
 
         GetComponent<ItemAnimator>().HandlePlaced();
 
+        this.insideInventory = true;
 
     }
 

@@ -436,4 +436,21 @@ public class Inventory : MonoBehaviour
             cellImages[rawIdx].sprite = linkSprites[links];
         }
     }
+
+    public void SaveState(ref InventorySaveState save)
+    {
+        save.freecells = this.freeCells;
+    }
+
+    public void Load(InventorySaveState save)
+    {
+        this.freeCells = save.freecells;
+    }
+
+}
+
+[System.Serializable]
+public struct InventorySaveState
+{
+    public bool[] freecells;
 }
